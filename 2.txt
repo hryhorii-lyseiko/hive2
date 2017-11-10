@@ -1,0 +1,30 @@
+DROP TABLE cancelled;
+DROP TABLE filtered_carriers;
+
+CREATE TEMPORARY TABLE cancelled
+STORED AS ORCFILE
+AS
+SELECT cf.carrier carrier_id, a.city city  FROM
+(SELECT uniquecarrier as carrier, origin FROM flights WHERE Cancelled=1) cf
+JOIN airports a
+on (a.iata=cf.origin);
+
+CREATE TEMPORARY TABLE filtered_carriers
+STORED AS ORCFILE
+AS
+SELECT cc.carrier_id carrier_id, c.Description carrier_name, cc.count count FROM 
+(SELECT carrier_id, COUNT(*) as count FROM cancelled  
+GROUP BY carrier_id 
+HAVING count>1 
+ORDER BY count DESC) cc
+JOIN
+carriers c
+on (cc.carrier_id=c.Code);
+
+SELECT filtered.carrier_name, filtered.count, ccity.cities
+FROM filtered_carriers as filtered
+LEFT JOIN
+(SELECT carrier_id, concat_ws(", ", collect_set(city)) cities FROM cancelled
+GROUP BY carrier_id) ccity
+
+ON (filtered.carrier_id=ccity.carrier_id);
